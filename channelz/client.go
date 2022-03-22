@@ -2,6 +2,7 @@ package channelz
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -17,27 +18,32 @@ import (
 
 var timeNow = time.Now
 
-type ChannelzClient struct {
+type Client struct {
 	cc channelzpb.ChannelzClient
 	w  io.Writer
 }
 
-func NewClient(conn *grpc.ClientConn, w io.Writer) *ChannelzClient {
-	return &ChannelzClient{
+func NewClient(conn *grpc.ClientConn, w io.Writer) *Client {
+	return &Client{
 		cc: channelzpb.NewChannelzClient(conn),
 		w:  w,
 	}
 }
 
-func (cc *ChannelzClient) printf(format string, a ...interface{}) (n int, err error) {
-	return fmt.Fprintf(cc.w, format, a...)
+func (cc *Client) printf(format string, a ...interface{}) {
+	_, _ = fmt.Fprintf(cc.w, format, a...)
+	return
 }
 
-func (cc *ChannelzClient) DescribeServer(ctx context.Context, name string) {
+func (cc *Client) DescribeServer(opts *Options, ctx context.Context, name string) error {
 	server := cc.findServer(ctx, name)
 	if server == nil {
-		fmt.Printf("server %q not found", name)
-		return
+		cc.printf("server %q not found", name)
+		return nil
+	}
+
+	if opts.Json {
+		return json.NewEncoder(cc.w).Encode(server)
 	}
 
 	cc.printf("ID: \t%d\n", server.Ref.ServerId)
@@ -63,9 +69,11 @@ func (cc *ChannelzClient) DescribeServer(ctx context.Context, name string) {
 			}
 		}
 	}
+
+	return nil
 }
 
-func (cc *ChannelzClient) findServer(ctx context.Context, name string) *channelzpb.Server {
+func (cc *Client) findServer(ctx context.Context, name string) *channelzpb.Server {
 	n, err := strconv.Atoi(name)
 	if err != nil {
 		return cc.findServerByName(ctx, name)
@@ -73,7 +81,7 @@ func (cc *ChannelzClient) findServer(ctx context.Context, name string) *channelz
 	return cc.findServerByID(ctx, int64(n))
 }
 
-func (cc *ChannelzClient) findServerByName(ctx context.Context, name string) *channelzpb.Server {
+func (cc *Client) findServerByName(ctx context.Context, name string) *channelzpb.Server {
 	var found *channelzpb.Server
 	cc.visitGetServers(ctx, func(server *channelzpb.Server) {
 		if server.Ref.Name == name {
@@ -86,7 +94,7 @@ func (cc *ChannelzClient) findServerByName(ctx context.Context, name string) *ch
 	return found
 }
 
-func (cc *ChannelzClient) findServerByID(ctx context.Context, id int64) *channelzpb.Server {
+func (cc *Client) findServerByID(ctx context.Context, id int64) *channelzpb.Server {
 	var found *channelzpb.Server
 	cc.visitGetServers(ctx, func(server *channelzpb.Server) {
 		if server.Ref.ServerId == id {
@@ -97,11 +105,15 @@ func (cc *ChannelzClient) findServerByID(ctx context.Context, id int64) *channel
 	return found
 }
 
-func (cc *ChannelzClient) DescribeChannel(ctx context.Context, name string) {
+func (cc *Client) DescribeChannel(opts *Options, ctx context.Context, name string) error {
 	channel := cc.findTopChannel(ctx, name)
 	if channel == nil {
 		cc.printf("channel %q not found", name)
-		return
+		return nil
+	}
+
+	if opts.Json {
+		return json.NewEncoder(cc.w).Encode(channel)
 	}
 
 	cc.printf("ID:       \t%d\n", channel.Ref.ChannelId)
@@ -170,9 +182,10 @@ func (cc *ChannelzClient) DescribeChannel(ctx context.Context, name string) {
 			}
 		}
 	}
+	return nil
 }
 
-func (cc *ChannelzClient) findSocketByID(ctx context.Context, id int64) *channelzpb.Socket {
+func (cc *Client) findSocketByID(ctx context.Context, id int64) *channelzpb.Socket {
 	res, err := cc.cc.GetSocket(ctx, &channelzpb.GetSocketRequest{SocketId: id})
 	if err != nil {
 		if status.Code(err) == codes.NotFound {
@@ -184,18 +197,21 @@ func (cc *ChannelzClient) findSocketByID(ctx context.Context, id int64) *channel
 	return res.Socket
 }
 
-func (cc *ChannelzClient) DescribeServerSocket(ctx context.Context, name string) {
+func (cc *Client) DescribeServerSocket(opts *Options, ctx context.Context, name string) error {
 	id, err := strconv.ParseInt(name, 10, 64)
 	if err != nil {
-		// TODO: find by name
 		cc.printf("serversocket %q not found", name)
-		return
+		return nil
 	}
 
 	socket := cc.findSocketByID(ctx, id)
 	if socket == nil {
 		cc.printf("serversocket %q not found", name)
-		return
+		return nil
+	}
+
+	if opts.Json {
+		return json.NewEncoder(cc.w).Encode(socket)
 	}
 
 	cc.printf("ID:       \t%d\n", socket.Ref.SocketId)
@@ -224,7 +240,6 @@ func (cc *ChannelzClient) DescribeServerSocket(ctx context.Context, name string)
 	if socket.Security == nil {
 		cc.printf("  Model: none\n")
 	} else {
-
 		switch socket.Security.GetModel().(type) {
 		case *channelzpb.Security_Tls_:
 			cc.printf("  Model: tls\n")
@@ -232,13 +247,17 @@ func (cc *ChannelzClient) DescribeServerSocket(ctx context.Context, name string)
 			cc.printf("  Model: other\n")
 		}
 	}
+
+	return nil
 }
 
-func (cc *ChannelzClient) ListServers(ctx context.Context) {
+func (cc *Client) ListServers(opts *Options, ctx context.Context) error {
 	now := timeNow()
 
-	cc.printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		"ID", "Name", "LocalAddr", "Calls", "Success", "Fail", "LastCall")
+	if !opts.Json {
+		cc.printf("%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			"ID", "Name", "LocalAddr", "Calls", "Success", "Fail", "LastCall")
+	}
 
 	cc.visitGetServers(ctx, func(server *channelzpb.Server) {
 		// see first socket only
@@ -256,6 +275,11 @@ func (cc *ChannelzClient) ListServers(ctx context.Context) {
 			localAddr = fmt.Sprintf("[%v]:%v", net.IP(addr.IpAddress).String(), addr.Port)
 		}
 
+		if opts.Json {
+			_ = json.NewEncoder(cc.w).Encode(server)
+			return
+		}
+
 		cc.printf("%d\t%s\t%-12s\t%-6d\t%-6d\t%-6d\t%s\n",
 			server.Ref.ServerId,
 			decorateEmpty(server.Ref.Name),
@@ -266,9 +290,11 @@ func (cc *ChannelzClient) ListServers(ctx context.Context) {
 			elapsedTimestamp(now, server.Data.LastCallStartedTimestamp),
 		)
 	})
+
+	return nil
 }
 
-func (cc *ChannelzClient) TreeServers(ctx context.Context) {
+func (cc *Client) TreeServers(ctx context.Context) {
 	now := timeNow()
 	cc.visitGetServers(ctx, func(server *channelzpb.Server) {
 		cc.printf("ID: %v, Name: %v\n", server.Ref.ServerId, server.Ref.Name)
@@ -298,7 +324,7 @@ func (cc *ChannelzClient) TreeServers(ctx context.Context) {
 	})
 }
 
-func (cc *ChannelzClient) visitGetServers(ctx context.Context, fn func(*channelzpb.Server)) {
+func (cc *Client) visitGetServers(ctx context.Context, fn func(*channelzpb.Server)) {
 	lastServerID := int64(0)
 	for {
 		res, err := cc.cc.GetServers(ctx, &channelzpb.GetServersRequest{StartServerId: lastServerID})
@@ -317,13 +343,20 @@ func (cc *ChannelzClient) visitGetServers(ctx context.Context, fn func(*channelz
 	}
 }
 
-func (cc *ChannelzClient) ListTopChannels(ctx context.Context) {
+func (cc *Client) ListTopChannels(opts *Options, ctx context.Context) error {
 	now := timeNow()
 
-	cc.printf("%s\t%-80s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		"ID", "Name", "State", "Channel", "SubChannel", "Calls", "Success", "Fail", "LastCall")
+	if !opts.Json {
+		cc.printf("%s\t%-80s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			"ID", "Name", "State", "Channel", "SubChannel", "Calls", "Success", "Fail", "LastCall")
+	}
 
 	cc.visitTopChannels(ctx, func(channel *channelzpb.Channel) {
+		if opts.Json {
+			_ = json.NewEncoder(cc.w).Encode(channel)
+			return
+		}
+
 		cc.printf("%d\t%-80s\t%s\t%-7d\t%-10d\t%-6d\t%-6d\t%-6d\t%-8s\n",
 			channel.Ref.ChannelId,
 			decorateEmpty(channel.Ref.Name),
@@ -336,6 +369,7 @@ func (cc *ChannelzClient) ListTopChannels(ctx context.Context) {
 			elapsedTimestamp(now, channel.Data.LastCallStartedTimestamp),
 		)
 	})
+	return nil
 }
 
 func addrToString(addr *channelzpb.Address) string {
@@ -345,7 +379,7 @@ func addrToString(addr *channelzpb.Address) string {
 	return ""
 }
 
-func (cc *ChannelzClient) ListServerSockets(ctx context.Context) {
+func (cc *Client) ListServerSockets(ctx context.Context) {
 	now := timeNow()
 
 	cc.printf("%s\t%s\t%-40s\t%-20s\t%-20s\t%-20s\t%s\t%s\t%s\t%s\n",
@@ -372,7 +406,7 @@ func (cc *ChannelzClient) ListServerSockets(ctx context.Context) {
 	})
 }
 
-func (cc *ChannelzClient) visitGetServerSockets(ctx context.Context, id int64, fn func(*channelzpb.Socket)) {
+func (cc *Client) visitGetServerSockets(ctx context.Context, id int64, fn func(*channelzpb.Socket)) {
 	lastSocketID := int64(0)
 	for {
 		res, err := cc.cc.GetServerSockets(ctx, &channelzpb.GetServerSocketsRequest{
@@ -399,7 +433,7 @@ func (cc *ChannelzClient) visitGetServerSockets(ctx context.Context, id int64, f
 	}
 }
 
-func (cc *ChannelzClient) TreeTopChannels(ctx context.Context) {
+func (cc *Client) TreeTopChannels(ctx context.Context) {
 	now := timeNow()
 
 	cc.visitTopChannels(ctx, func(channel *channelzpb.Channel) {
@@ -470,7 +504,7 @@ func (cc *ChannelzClient) TreeTopChannels(ctx context.Context) {
 	})
 }
 
-func (cc *ChannelzClient) findTopChannel(ctx context.Context, name string) *channelzpb.Channel {
+func (cc *Client) findTopChannel(ctx context.Context, name string) *channelzpb.Channel {
 	n, err := strconv.Atoi(name)
 	if err != nil {
 		return cc.findTopChannelByName(ctx, name)
@@ -478,7 +512,7 @@ func (cc *ChannelzClient) findTopChannel(ctx context.Context, name string) *chan
 	return cc.findTopChannelByID(ctx, int64(n))
 }
 
-func (cc *ChannelzClient) findTopChannelByName(ctx context.Context, name string) *channelzpb.Channel {
+func (cc *Client) findTopChannelByName(ctx context.Context, name string) *channelzpb.Channel {
 	var found *channelzpb.Channel
 	cc.visitTopChannels(ctx, func(channel *channelzpb.Channel) {
 		if channel.Ref.Name == name {
@@ -491,7 +525,7 @@ func (cc *ChannelzClient) findTopChannelByName(ctx context.Context, name string)
 	return found
 }
 
-func (cc *ChannelzClient) findTopChannelByID(ctx context.Context, id int64) *channelzpb.Channel {
+func (cc *Client) findTopChannelByID(ctx context.Context, id int64) *channelzpb.Channel {
 	var found *channelzpb.Channel
 	cc.visitTopChannels(ctx, func(channel *channelzpb.Channel) {
 		if channel.Ref.ChannelId == id {
@@ -502,7 +536,7 @@ func (cc *ChannelzClient) findTopChannelByID(ctx context.Context, id int64) *cha
 	return found
 }
 
-func (cc *ChannelzClient) visitTopChannels(ctx context.Context, fn func(*channelzpb.Channel)) {
+func (cc *Client) visitTopChannels(ctx context.Context, fn func(*channelzpb.Channel)) {
 	lastChannelID := int64(0)
 	retry := 0
 	for {
@@ -512,9 +546,10 @@ func (cc *ChannelzClient) visitTopChannels(ctx context.Context, fn func(*channel
 		default:
 		}
 
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second*time.Duration(retry+1))
-		defer cancel()
-		res, err := cc.cc.GetTopChannels(ctx, &channelzpb.GetTopChannelsRequest{StartChannelId: lastChannelID})
+		c, cancel := context.WithTimeout(ctx, 5*time.Second*time.Duration(retry+1))
+		res, err := cc.cc.GetTopChannels(c, &channelzpb.GetTopChannelsRequest{StartChannelId: lastChannelID})
+		cancel()
+
 		if err != nil {
 			retry++
 			continue

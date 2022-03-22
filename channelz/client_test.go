@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-func newTestClient1(b *bytes.Buffer) *ChannelzClient {
-	return &ChannelzClient{
+func newTestClient1(b *bytes.Buffer) *Client {
+	return &Client{
 		w:  b,
 		cc: fakeChannelzClient1,
 	}
@@ -39,12 +39,12 @@ Calls:
 `
 		t.Run("ByID", func(t *testing.T) {
 			b.Reset()
-			c.DescribeServer(ctx, "0")
+			_ = c.DescribeServer(&Options{}, ctx, "0")
 			assertOutput(t, expected, b.String())
 		})
 		t.Run("ByName", func(t *testing.T) {
 			b.Reset()
-			c.DescribeServer(ctx, "server0")
+			_ = c.DescribeServer(&Options{}, ctx, "server0")
 			assertOutput(t, expected, b.String())
 		})
 	})
@@ -61,12 +61,12 @@ Calls:
 `
 		t.Run("ByID", func(t *testing.T) {
 			b.Reset()
-			c.DescribeServer(ctx, "1")
+			_ = c.DescribeServer(&Options{}, ctx, "1")
 			assertOutput(t, expected, b.String())
 		})
 		t.Run("ByName", func(t *testing.T) {
 			b.Reset()
-			c.DescribeServer(ctx, "server1")
+			_ = c.DescribeServer(&Options{}, ctx, "server1")
 			assertOutput(t, expected, b.String())
 		})
 	})
@@ -99,12 +99,12 @@ Trace:
 `
 		t.Run("ByID", func(t *testing.T) {
 			b.Reset()
-			c.DescribeChannel(ctx, "0")
+			_ = c.DescribeChannel(&Options{}, ctx, "0")
 			assertOutput(t, expected, b.String())
 		})
 		t.Run("ByName", func(t *testing.T) {
 			b.Reset()
-			c.DescribeChannel(ctx, "foo0")
+			_ = c.DescribeChannel(&Options{}, ctx, "foo0")
 			assertOutput(t, expected, b.String())
 		})
 	})
@@ -134,12 +134,12 @@ Trace:
 `
 		t.Run("ByID", func(t *testing.T) {
 			b.Reset()
-			c.DescribeChannel(ctx, "1")
+			_ = c.DescribeChannel(&Options{}, ctx, "1")
 			assertOutput(t, expected, b.String())
 		})
 		t.Run("ByName", func(t *testing.T) {
 			b.Reset()
-			c.DescribeChannel(ctx, "foo1")
+			_ = c.DescribeChannel(&Options{}, ctx, "foo1")
 			assertOutput(t, expected, b.String())
 		})
 	})
@@ -157,7 +157,7 @@ ID	Name	LocalAddr	Calls	Success	Fail	LastCall
 1	server1	[127.0.1.2]:9001	110   	99    	11    	0ms
 `
 		b.Reset()
-		c.ListServers(ctx)
+		_ = c.ListServers(&Options{}, ctx)
 		assertOutput(t, expected, b.String())
 	})
 }
@@ -174,7 +174,7 @@ ID	Name                                                                         
 1	foo1                                                                            	READY	0      	4         	110   	99    	11    	0ms
 `
 		b.Reset()
-		c.ListTopChannels(ctx)
+		_ = c.ListTopChannels(&Options{}, ctx)
 		assertOutput(t, expected, b.String())
 	})
 }

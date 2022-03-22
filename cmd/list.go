@@ -3,22 +3,24 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"time"
 
-	"github.com/kazegusuri/channelzcli/channelz"
+	"github.com/bingoohuang/channelzcli/channelz"
 	"github.com/spf13/cobra"
 )
 
 type ListCommand struct {
 	cmd  *cobra.Command
-	opts *GlobalOptions
+	opts *channelz.Options
 	addr string
 	long bool
 	full bool
 }
 
-func NewListCommand(opts *GlobalOptions) *ListCommand {
+func NewListCommand(opts *channelz.Options) *ListCommand {
 	c := &ListCommand{
 		cmd: &cobra.Command{
 			Use:          "list (channel|server|serversocket)",
@@ -37,7 +39,13 @@ func (c *ListCommand) Command() *cobra.Command {
 	return c.cmd
 }
 
-func (c *ListCommand) Run(cmd *cobra.Command, args []string) error {
+func closeX(conn io.Closer) {
+	if err := conn.Close(); err != nil {
+		log.Printf("close failed: %v", err)
+	}
+}
+
+func (c *ListCommand) Run(_ *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	typ := args[0]
@@ -48,19 +56,19 @@ func (c *ListCommand) Run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect %v: %v", c.opts.Address, err)
 	}
-	defer conn.Close()
+	defer closeX(conn)
 
 	cc := channelz.NewClient(conn, c.opts.Output)
 
 	switch typ {
-	case "channel":
-		cc.ListTopChannels(ctx)
-	case "server":
-		cc.ListServers(ctx)
-	case "serversocket":
+	case "channel", "c":
+		return cc.ListTopChannels(c.opts, ctx)
+	case "server", "s":
+		return cc.ListServers(c.opts, ctx)
+	case "serversocket", "so", "ss":
 		cc.ListServerSockets(ctx)
 	default:
-		c.cmd.Usage()
+		_ = c.cmd.Usage()
 		os.Exit(1)
 	}
 

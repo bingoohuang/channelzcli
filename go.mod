@@ -1,15 +1,19 @@
-module github.com/kazegusuri/channelzcli
+module github.com/bingoohuang/channelzcli
 
-go 1.14
+go 1.18
 
 require (
-	github.com/golang/protobuf v1.4.2
-	github.com/google/go-cmp v0.4.1 // indirect
-	github.com/spf13/cobra v1.0.0
+	github.com/golang/protobuf v1.5.2
+	github.com/spf13/cobra v1.4.0
+	google.golang.org/grpc v1.45.0
+	google.golang.org/protobuf v1.26.0
+)
+
+require (
+	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	golang.org/x/net v0.0.0-20200602114024-627f9648deb9 // indirect
-	golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1 // indirect
-	golang.org/x/text v0.3.3 // indirect
-	google.golang.org/genproto v0.0.0-20200616192300-fc83d8c00726 // indirect
-	google.golang.org/grpc v1.29.1
+	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
+	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd // indirect
+	golang.org/x/text v0.3.0 // indirect
+	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
 )

@@ -4,19 +4,19 @@ import (
 	"context"
 	"os"
 
-	"github.com/kazegusuri/channelzcli/channelz"
+	"github.com/bingoohuang/channelzcli/channelz"
 	"github.com/spf13/cobra"
 )
 
 type TreeCommand struct {
 	cmd  *cobra.Command
-	opts *GlobalOptions
+	opts *channelz.Options
 	addr string
 	long bool
 	full bool
 }
 
-func NewTreeCommand(opts *GlobalOptions) *TreeCommand {
+func NewTreeCommand(opts *channelz.Options) *TreeCommand {
 	c := &TreeCommand{
 		cmd: &cobra.Command{
 			Use:          "tree (channel|server)",
@@ -34,7 +34,7 @@ func (c *TreeCommand) Command() *cobra.Command {
 	return c.cmd
 }
 
-func (c *TreeCommand) Run(cmd *cobra.Command, args []string) error {
+func (c *TreeCommand) Run(_ *cobra.Command, args []string) error {
 	ctx := context.Background()
 	typ := args[0]
 
@@ -42,17 +42,17 @@ func (c *TreeCommand) Run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer closeX(conn)
 
 	cc := channelz.NewClient(conn, c.opts.Output)
 
 	switch typ {
-	case "channel":
+	case "channel", "c":
 		cc.TreeTopChannels(ctx)
-	case "server":
+	case "server", "s":
 		cc.TreeServers(ctx)
 	default:
-		c.cmd.Usage()
+		_ = c.cmd.Usage()
 		os.Exit(1)
 	}
 

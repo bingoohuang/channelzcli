@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/golang/protobuf/ptypes"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"google.golang.org/grpc"
 	channelzpb "google.golang.org/grpc/channelz/grpc_channelz_v1"
@@ -23,21 +24,21 @@ type fakeChannelzClient struct {
 	sockets     []*channelzpb.Socket
 }
 
-func (c *fakeChannelzClient) GetTopChannels(ctx context.Context, in *channelzpb.GetTopChannelsRequest, opts ...grpc.CallOption) (*channelzpb.GetTopChannelsResponse, error) {
+func (c *fakeChannelzClient) GetTopChannels(context.Context, *channelzpb.GetTopChannelsRequest, ...grpc.CallOption) (*channelzpb.GetTopChannelsResponse, error) {
 	return &channelzpb.GetTopChannelsResponse{
 		Channel: c.topChannels,
 		End:     true,
 	}, nil
 }
 
-func (c *fakeChannelzClient) GetServers(ctx context.Context, in *channelzpb.GetServersRequest, opts ...grpc.CallOption) (*channelzpb.GetServersResponse, error) {
+func (c *fakeChannelzClient) GetServers(context.Context, *channelzpb.GetServersRequest, ...grpc.CallOption) (*channelzpb.GetServersResponse, error) {
 	return &channelzpb.GetServersResponse{
 		Server: c.servers,
 		End:    true,
 	}, nil
 }
 
-func (c *fakeChannelzClient) GetServer(ctx context.Context, in *channelzpb.GetServerRequest, opts ...grpc.CallOption) (*channelzpb.GetServerResponse, error) {
+func (c *fakeChannelzClient) GetServer(_ context.Context, in *channelzpb.GetServerRequest, _ ...grpc.CallOption) (*channelzpb.GetServerResponse, error) {
 	for _, s := range c.servers {
 		if in.ServerId == s.Ref.ServerId {
 			return &channelzpb.GetServerResponse{
@@ -48,11 +49,11 @@ func (c *fakeChannelzClient) GetServer(ctx context.Context, in *channelzpb.GetSe
 	return nil, status.Errorf(codes.NotFound, "not found")
 }
 
-func (c *fakeChannelzClient) GetServerSockets(ctx context.Context, in *channelzpb.GetServerSocketsRequest, opts ...grpc.CallOption) (*channelzpb.GetServerSocketsResponse, error) {
+func (c *fakeChannelzClient) GetServerSockets(context.Context, *channelzpb.GetServerSocketsRequest, ...grpc.CallOption) (*channelzpb.GetServerSocketsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "not implemented")
 }
 
-func (c *fakeChannelzClient) GetChannel(ctx context.Context, in *channelzpb.GetChannelRequest, opts ...grpc.CallOption) (*channelzpb.GetChannelResponse, error) {
+func (c *fakeChannelzClient) GetChannel(_ context.Context, in *channelzpb.GetChannelRequest, _ ...grpc.CallOption) (*channelzpb.GetChannelResponse, error) {
 	for _, ch := range c.channels {
 		if in.ChannelId == ch.Ref.ChannelId {
 			return &channelzpb.GetChannelResponse{
@@ -63,7 +64,7 @@ func (c *fakeChannelzClient) GetChannel(ctx context.Context, in *channelzpb.GetC
 	return nil, status.Errorf(codes.NotFound, "not found")
 }
 
-func (c *fakeChannelzClient) GetSubchannel(ctx context.Context, in *channelzpb.GetSubchannelRequest, opts ...grpc.CallOption) (*channelzpb.GetSubchannelResponse, error) {
+func (c *fakeChannelzClient) GetSubchannel(_ context.Context, in *channelzpb.GetSubchannelRequest, _ ...grpc.CallOption) (*channelzpb.GetSubchannelResponse, error) {
 	for _, ch := range c.subchannels {
 		if in.SubchannelId == ch.Ref.SubchannelId {
 			return &channelzpb.GetSubchannelResponse{
@@ -74,7 +75,7 @@ func (c *fakeChannelzClient) GetSubchannel(ctx context.Context, in *channelzpb.G
 	return nil, status.Errorf(codes.NotFound, "not found")
 }
 
-func (c *fakeChannelzClient) GetSocket(ctx context.Context, in *channelzpb.GetSocketRequest, opts ...grpc.CallOption) (*channelzpb.GetSocketResponse, error) {
+func (c *fakeChannelzClient) GetSocket(_ context.Context, in *channelzpb.GetSocketRequest, _ ...grpc.CallOption) (*channelzpb.GetSocketResponse, error) {
 	for _, socket := range c.sockets {
 		if in.SocketId == socket.Ref.SocketId {
 			return &channelzpb.GetSocketResponse{
@@ -173,7 +174,7 @@ func testCreateSocket(param socketParam) *channelzpb.Socket {
 		localAddr = &channelzpb.Address{
 			Address: &channelzpb.Address_TcpipAddress{
 				TcpipAddress: &channelzpb.Address_TcpIpAddress{
-					IpAddress: []byte(param.localIP),
+					IpAddress: param.localIP,
 					Port:      param.localPort,
 				},
 			},
@@ -184,7 +185,7 @@ func testCreateSocket(param socketParam) *channelzpb.Socket {
 		remoteAddr = &channelzpb.Address{
 			Address: &channelzpb.Address_TcpipAddress{
 				TcpipAddress: &channelzpb.Address_TcpIpAddress{
-					IpAddress: []byte(param.remoteIP),
+					IpAddress: param.remoteIP,
 					Port:      param.remotePort,
 				},
 			},
@@ -223,13 +224,11 @@ func testCreateServer(param serverParam) *channelzpb.Server {
 	}
 }
 
-var (
-	fakeChannelzClient1 channelzpb.ChannelzClient
-)
+var fakeChannelzClient1 channelzpb.ChannelzClient
 
 func init() {
 	now := fixedTime
-	ts1, _ := ptypes.TimestampProto(now)
+	ts1 := timestamppb.New(now)
 
 	srvsock1 := testCreateSocket(socketParam{
 		localIP:   net.IPv4(127, 0, 1, 2),
