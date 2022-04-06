@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/bingoohuang/channelzcli/channelz"
+	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +50,7 @@ func (c *DescribeCommand) Run(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect %v: %v", c.opts.Address, err)
 	}
-	defer closeX(conn)
+	defer iox.Close(conn)
 
 	cc := channelz.NewClient(conn, c.opts.Output)
 
