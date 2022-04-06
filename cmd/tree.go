@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/bingoohuang/channelzcli/channelz"
+	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +43,7 @@ func (c *TreeCommand) Run(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	defer closeX(conn)
+	defer iox.Close(conn)
 
 	cc := channelz.NewClient(conn, c.opts.Output)
 

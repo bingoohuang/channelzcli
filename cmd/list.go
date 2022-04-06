@@ -3,12 +3,11 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io"
-	"log"
 	"os"
 	"time"
 
 	"github.com/bingoohuang/channelzcli/channelz"
+	"github.com/bingoohuang/gg/pkg/iox"
 	"github.com/spf13/cobra"
 )
 
@@ -39,12 +38,6 @@ func (c *ListCommand) Command() *cobra.Command {
 	return c.cmd
 }
 
-func closeX(conn io.Closer) {
-	if err := conn.Close(); err != nil {
-		log.Printf("close failed: %v", err)
-	}
-}
-
 func (c *ListCommand) Run(_ *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -56,7 +49,7 @@ func (c *ListCommand) Run(_ *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect %v: %v", c.opts.Address, err)
 	}
-	defer closeX(conn)
+	defer iox.Close(conn)
 
 	cc := channelz.NewClient(conn, c.opts.Output)
 
